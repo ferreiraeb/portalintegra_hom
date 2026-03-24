@@ -27,14 +27,17 @@ return [
     ],*/
 	'db' => [
 		'driver'   => 'sqlsrv',
-		'server'   => '10.16.96.10,3310',
+		//'server'   => '10.16.96.10,3310',
+		'server'   => '10.16.96.10,2160',
 		'database' => 'Portal_Integra',
 		'username' => 'portalintegra',
 		'password' => 'Val@Portal#Integra%2026',
 		'options'  => [],
 
 		// 👇 NOVO: informe o nome da outra base no MESMO servidor
-		'dealernet_database' => 'GrupoValence_HML',
+		//'dealernet_database' => 'GrupoValence_HML',
+		'dealernet_database' => 'GrupoValence_DealernetWF',
+	
 	],
     'ldap' => [
         'enabled'      => true,
