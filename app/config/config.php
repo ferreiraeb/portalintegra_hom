@@ -39,6 +39,11 @@ return [
 		'password' => 'Val@Portal#Integra%2026',
 		'options'  => [],
 
+		// ODBC Driver 18 força criptografia por padrão.
+		// O servidor usa certificado self-signed → precisamos confiar nele.
+		'encrypt'                  => true,
+		'trust_server_certificate' => true,
+
 		// 👇 NOVO: informe o nome da outra base no MESMO servidor
 		'dealernet_database' => 'GrupoValence_HML',
 	],
