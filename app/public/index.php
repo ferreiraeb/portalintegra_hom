@@ -18,7 +18,7 @@ switch ($path) {
                         render_page('home/index.php');
                         break;
     case 'login':
-        $authCtrl->index();
+        $authCtrl->login();
         break;
 
     case 'logout':
