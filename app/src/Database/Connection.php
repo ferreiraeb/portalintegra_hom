@@ -15,7 +15,16 @@ class Connection {
             throw new \RuntimeException('Driver não implementado nesta fase.');
         }
 
-        $dsn = "sqlsrv:Server={$db['server']};Database={$db['database']}";
+        //$dsn = "sqlsrv:Server={$db['server']};Database={$db['database']}";
+        
+          $dsn = sprintf(
+                    "sqlsrv:Server=%s;Database=%s;Encrypt=%s;TrustServerCertificate=%s",
+                    $db['server'],
+                    $db['database'],
+                    $encrypt,
+                    $trust
+                );
+
 
         // ODBC Driver 18 força Encrypt=yes por padrão.
         // Para servidores com certificado self-signed é preciso
