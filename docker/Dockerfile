@@ -48,7 +48,7 @@ RUN set -eux; \
     rm -rf /var/lib/apt/lists/*
 
 # Adiciona mssql-tools18 ao PATH
-ENV PATH="$PATH:/opt/mssql-tools18/bin"
+ENV PATH="$PATH:/opt/mssql-tools17/bin"
 
 # ------------------------------------------------------------
 # 3) Extensões PHP para SQL Server (PECL) – versão fixada
