@@ -37,6 +37,12 @@ return [
 		'database' => 'Portal_Integra',
 		'username' => 'portalintegra',
 		'password' => 'Val@Portal#Integra%2026',
+
+
+	    // ✅ ODBC Driver 18 - parâmetros SSL
+    	'encrypt' => true,
+    	'trust_server_certificate' => true,
+	
 		'options'  => [],
 
 		// 👇 NOVO: informe o nome da outra base no MESMO servidor
