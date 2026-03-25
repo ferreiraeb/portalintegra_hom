@@ -43,12 +43,12 @@ RUN set -eux; \
     echo "deb [arch=amd64 signed-by=/usr/share/keyrings/ms.gpg] https://packages.microsoft.com/debian/12/prod bookworm main" > /etc/apt/sources.list.d/mssql-release.list; \
     apt-get update; \
     ACCEPT_EULA=Y apt-get install -y --no-install-recommends \
-      msodbcsql17 \
-      mssql-tools17; \
+      msodbcsql18 \
+      mssql-tools18; \
     rm -rf /var/lib/apt/lists/*
 
 # Adiciona mssql-tools18 ao PATH
-ENV PATH="$PATH:/opt/mssql-tools17/bin"
+ENV PATH="$PATH:/opt/mssql-tools18/bin"
 
 # ------------------------------------------------------------
 # 3) Extensões PHP para SQL Server (PECL) – versão fixada
