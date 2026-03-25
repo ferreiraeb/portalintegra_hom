@@ -18,6 +18,12 @@ return [
         'database' => 'Portal_Integra',
         'username' => 'portalintegra',
         'password' => 'Val@Portal#Integra%2026', // TROCAR
+
+	    // >>> Novos parâmetros (ODBC 18)
+    	// Em laboratório com certificado self-signed:
+    	'encrypt' => true,
+    	'trust_server_certificate' => true,
+		
         'options'  => [
             // PDO::SQLSRV_ATTR_DIRECT_QUERY, PDO::ATTR_ERRMODE, etc. serão definidos no Connection.php
         ],
@@ -27,8 +33,7 @@ return [
     ],*/
 	'db' => [
 		'driver'   => 'sqlsrv',
-		'server'   => '10.16.96.10,3310',
-		//'server'   => '10.16.96.10,2160',
+		'server'   => '10.16.96.10,3310', //HOMOLOGAÇÃO
 		'database' => 'Portal_Integra',
 		'username' => 'portalintegra',
 		'password' => 'Val@Portal#Integra%2026',
@@ -36,8 +41,6 @@ return [
 
 		// 👇 NOVO: informe o nome da outra base no MESMO servidor
 		'dealernet_database' => 'GrupoValence_HML',
-		//'dealernet_database' => 'GrupoValence_DealernetWF',
-	
 	],
     'ldap' => [
         'enabled'      => true,
@@ -65,4 +68,5 @@ return [
         'default_permission_level' => 0
     ],
 ];
+
 ?>
