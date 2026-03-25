@@ -14,9 +14,9 @@ $userCtrl = new UserController();
 switch ($path) {
     case '':
     case 'home':
-		\Security\Auth::requireAuth();
-			render_page('home/index.php');
-			break;
+                \Security\Auth::requireAuth();
+                        render_page('home/index.php');
+                        break;
     case 'login':
         $authCtrl->login();
         break;
@@ -45,44 +45,30 @@ switch ($path) {
         $userCtrl->delete();
         break;
 
-	case 'users/view-ad':
-		$userCtrl->viewAd();
-		break;
+        case 'users/view-ad':
+                $userCtrl->viewAd();
+                break;
 
-	case 'users/sync-ad':
-		$userCtrl->syncAd();
-		break;
+        case 'users/permissions':
+                // Exibe/edita permissões do usuário-alvo
+                $permCtrl = new \Controllers\PermissionController();
+                $permCtrl->edit();
+                break;
 
-	case 'users/permissions':
-		// Exibe/edita permissões do usuário-alvo
-		$permCtrl = new \Controllers\PermissionController();
-		$permCtrl->edit();
-		break;
+        case 'drilling/analise-di':
+                $drill = new \Controllers\DrillingController();
+                $drill->analiseDI();
+                break;
 
-	case 'drilling/analise-di':
-		$drill = new \Controllers\DrillingController();
-		$drill->analiseDI();
-		break;
+        case 'drilling/tabela-getman':
+                $ctrl = new \Controllers\DrillingGetmanController();
+                $ctrl->index();
+                break;
 
-	case 'drilling/tabela-getman':
-		$ctrl = new \Controllers\DrillingGetmanController();
-		$ctrl->index();
-		break;
-
-	case 'drilling/tabela-boart':
-		$c = new \Controllers\DrillingBoartController();
-		$c->index();
-		break;
-
-	case 'agro/tabela-massey':
-		$c = new \Controllers\AgroMasseyController();
-		$c->index();
-		break;
-
-	case 'docs':
-		$docs = new \Controllers\DocsController();
-		$docs->index();
-		break;
+        case 'docs':
+                $docs = new \Controllers\DocsController();
+                $docs->index();
+                break;
 
     default:
         http_response_code(404);
