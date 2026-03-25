@@ -18,6 +18,10 @@ return [
         'database' => 'Portal_Integra',
         'username' => 'portalintegra',
         'password' => 'Val@Portal#Integra%2026', // TROCAR
+
+    	'encrypt' => true,
+    	'trust_server_certificate' => true,
+		
         'options'  => [
             // PDO::SQLSRV_ATTR_DIRECT_QUERY, PDO::ATTR_ERRMODE, etc. serão definidos no Connection.php
         ],
