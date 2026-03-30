@@ -1,0 +1,30 @@
+version: "3.8"
+
+# =============================================================
+#  Portal Integra — Ambiente de Desenvolvimento Local
+#
+#  Uso:
+#    docker-compose -f docker-compose.dev.yml up --build
+#
+#  Pré-requisito: OpenVPN conectado (para alcançar o SQL Server
+#  em 10.16.96.10:3310 e o AD em 10.14.237.13).
+# =============================================================
+
+services:
+  portal-integra-dev:
+    build:
+      # Contexto = raiz do projeto (onde estão public/, src/, etc.)
+      context: .
+      dockerfile: Docker/Dockerfile.dev
+    container_name: portal_integra_dev
+    ports:
+      - "8080:80"
+    volumes:
+      # Monta a raiz do projeto diretamente em /var/www/html.
+      # O Apache serve /var/www/html/public (conforme vhosts.conf).
+      # Alterações nos arquivos PHP refletem imediatamente — sem rebuild.
+      - .:/var/www/html
+    environment:
+      TZ: America/Sao_Paulo
+    restart: unless-stopped
+

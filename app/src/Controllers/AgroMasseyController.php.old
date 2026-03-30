@@ -1,0 +1,510 @@
+<?php
+namespace Controllers;
+
+use Database\Connection;
+
+class AgroMasseyController
+{
+    // Marca fixa: MASSEY (96)
+    private const MARCA_NOME = 'Massey Ferguson';
+    private const MARCA_ID   = 96;
+
+    // Defaults exibidos como texto (percentuais)
+    private const DEF_OVERPRICE_TXT   = '15%';
+    private const DEF_INDICECUSTO_TXT = '70%';
+
+    /** Página principal + processamento + endpoints (export/update) */
+    public function index()
+    {
+        \Security\Auth::requireAuth();
+        \Security\Permission::require('agro.tabela_massey', 2);
+
+        // Cross‑DB: nome do banco DealerNet (ex.: GrupoValence_HML) vindo do config global
+        global $config;
+        $dealerDb = $config['db']['dealernet_database'] ?? '';
+        if ($dealerDb === '') {
+            return render_page('agro/tabela_massey.php', [
+                'erro'       => 'Database do DealerNet não configurada (db.dealernet_database).',
+                'rows'       => [], 'soSistema'=>[], 'soPlanilha'=>[],
+                'uiOver'     => self::DEF_OVERPRICE_TXT,
+                'uiIndice'   => self::DEF_INDICECUSTO_TXT,
+                'marcaNome'  => self::MARCA_NOME,
+                'base'       => base_url('agro/tabela-massey') // se seu helper existir
+            ]);
+        }
+
+        // Endpoints GET (exportar / atualizar)
+        if (($GLOBALS['_GET']['export'] ?? '') === '1') {
+            $this->exportCsv();
+            return;
+        }
+        if (($GLOBALS['_GET']['update'] ?? '') === '1') {
+            $msg = $this->atualizarValores($dealerDb);
+            $_SESSION['massey_flash'] = $msg;
+            redirect('agro/tabela-massey'); // volta para a própria tela
+            return;
+        }
+
+        // ----- Exibição inicial / processamento do arquivo LP% -----
+        $erro = null; $rows = []; $soSistema = []; $soPlanilha = [];
+        $overTxt   = (string)($GLOBALS['_POST']['overprice']     ?? self::DEF_OVERPRICE_TXT);
+        $indiceTxt = (string)($GLOBALS['_POST']['indice_custo']  ?? self::DEF_INDICECUSTO_TXT);
+
+        $over   = $this->percentToFraction($overTxt,   0.15); // 15% -> 0.15
+        $indice = $this->percentToFraction($indiceTxt, 0.70); // 70% -> 0.70
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['arquivo'])) {
+            try {
+                // 1) Ler arquivo LP% (texto colunas fixas) → mapa [ref => ['Valor','PartDescription']]
+                $plan = $this->lerArquivoMasseyLP($_FILES['arquivo']['tmp_name']);
+
+                // 2) Buscar SOMENTE produtos do DealerNet que estão na planilha (leve)
+                $refsPlan = array_keys($plan);
+                $sistema  = $this->carregarProdutosPorReferencia($dealerDb, self::MARCA_ID, $refsPlan);
+                $sysByRef = $this->indexBy($sistema, 'ProdutoReferencia');
+
+                // 2.1) Mapas: chave NORMALIZADA -> referência ORIGINAL
+                $sysNorm2Ref  = [];
+                $planNorm2Ref = [];
+                foreach ($sysByRef as $refSys => $p) {
+                    $k = $this->normalizeRefStrict((string)$refSys);
+                    if ($k !== '' && !isset($sysNorm2Ref[$k])) $sysNorm2Ref[$k] = (string)$refSys;
+                }
+                foreach ($plan as $refPlan => $payload) {
+                    $k = $this->normalizeRefStrict((string)$refPlan);
+                    if ($k !== '' && !isset($planNorm2Ref[$k])) $planNorm2Ref[$k] = (string)$refPlan;
+                }
+
+                // 3) Cruzamento + cálculos
+                $rows       = [];
+                $soSistema  = [];
+                $soPlanilha = [];
+
+                // 3.1) Match exato por chave NORMALIZADA
+                $commonsNorm = array_intersect(array_keys($sysNorm2Ref), array_keys($planNorm2Ref));
+                foreach ($commonsNorm as $kn) {
+                    $refSys  = $sysNorm2Ref[$kn];   // referência "oficial" do DealerNet
+                    $refPlan = $planNorm2Ref[$kn];  // como veio na planilha
+                    $p       = $sysByRef[$refSys];  // registro do DealerNet
+                    $payload = $plan[$refPlan] ?? [];
+
+                    $valorBRL = (float)($payload['Valor'] ?? 0.0);
+
+                    // Regras (valores já em BRL):
+                    // PS = valorBRL; PP = PS * (1 + over); RP = PS * indice; GA = RP
+                    $calc = $this->calcularPrecosMassey($valorBRL, $over, $indice);
+
+                    $rows[] = [
+                        'Marca'               => $p['Marca'] ?? self::MARCA_NOME,
+                        'Empresa'             => $p['Empresa'] ?? '',
+                        'ProdutoCodigo'       => $p['Produto_Codigo'] ?? ($p['ProdutoCodigo'] ?? 0),
+                        'ProdutoReferencia'   => (string)($p['ProdutoReferencia'] ?? ''),
+                        'ProdutoDescricao'    => $p['ProdutoDescricao'] ?? '',
+                        'NCMCodigo'           => $p['NCMCodigo'] ?? null,
+                        'NCMIdentificador'    => (string)($p['NCMIdentificador'] ?? ''),
+                        'ValorPlanilha'       => $valorBRL,          // em BRL
+                        'Overprice'           => $over,              // fração
+                        'IndiceParaCusto'     => $indice,            // fração
+                        'Tipo'                => 'Massey-BRL',
+                        'PrecoPublico'        => $calc['PP'],
+                        'PrecoSugerido'       => $calc['PS'],
+                        'PrecoGarantia'       => $calc['GA'],
+                        'PrecoReposicao'      => $calc['RP'],
+                    ];
+                }
+
+                // 3.2) Apenas DealerNet (no sistema e fora da planilha)
+                $onlySysNorm = array_diff(array_keys($sysNorm2Ref), array_keys($planNorm2Ref));
+                foreach ($onlySysNorm as $kn) {
+                    $refSys = $sysNorm2Ref[$kn];
+                    $soSistema[] = $sysByRef[$refSys];
+                }
+
+                // 3.3) Apenas Planilha (na planilha e fora do sistema)
+                $onlyPlanNorm = array_diff(array_keys($planNorm2Ref), array_keys($sysNorm2Ref));
+                foreach ($onlyPlanNorm as $kn) {
+                    $refPlan = $planNorm2Ref[$kn];
+                    $payload = $plan[$refPlan] ?? [];
+                    $soPlanilha[] = [
+                        'ProdutoReferencia' => (string)$refPlan,
+                        'PartDescription'   => $payload['PartDescription'] ?? '',
+                        'ValorPlanilha'     => isset($payload['Valor']) ? $payload['Valor'] : 0,
+                        'RefNormalizada'    => $kn,
+                    ];
+                }
+
+                // Guarda em sessão para Export/Update
+                $_SESSION['massey_result']  = $rows;
+                $_SESSION['massey_sysOnly'] = $soSistema;
+                $_SESSION['massey_lpOnly']  = $soPlanilha;
+
+            } catch (\Throwable $e) {
+                $erro = 'Falha ao processar o arquivo: '.$e->getMessage();
+            }
+        } else {
+            // Exibição inicial reaproveitando sessão
+            $_SESSION['massey_result']  = $_SESSION['massey_result']  ?? [];
+            $_SESSION['massey_sysOnly'] = $_SESSION['massey_sysOnly'] ?? [];
+            $_SESSION['massey_lpOnly']  = $_SESSION['massey_lpOnly']  ?? [];
+            $rows       = $_SESSION['massey_result'];
+            $soSistema  = $_SESSION['massey_sysOnly'];
+            $soPlanilha = $_SESSION['massey_lpOnly'];
+        }
+
+        render_page('agro/tabela_massey.php', [
+            'erro'      => $erro,
+            'rows'      => $rows,
+            'soSistema' => $soSistema,
+            'soPlanilha'=> $soPlanilha,
+            'uiOver'    => $overTxt ?: self::DEF_OVERPRICE_TXT,
+            'uiIndice'  => $indiceTxt ?: self::DEF_INDICECUSTO_TXT,
+            'marcaNome' => self::MARCA_NOME,
+            'base'      => base_url('agro/tabela-massey')
+        ]);
+    }
+
+    /** ============ ENDPOINTS AUXILIARES ============ */
+
+    /** GET ?export=1 */
+    private function exportCsv(): void
+    {
+        $dados = $_SESSION['massey_result'] ?? [];
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="massey_result.csv"');
+        // BOM para Excel
+        echo "\xEF\xBB\xBF";
+        if (empty($dados)) { echo "Sem dados.\n"; return; }
+        $headers = array_keys($dados[0]);
+        $f = fopen('php://output','w');
+        fputcsv($f, $headers, ';');
+        foreach ($dados as $r) {
+            $line = [];
+            foreach ($headers as $h) {
+                $line[] = $this->csvFormat($h, $r[$h] ?? '');
+            }
+            fputcsv($f, $line, ';');
+        }
+        fclose($f);
+    }
+
+    /** GET ?update=1 */
+    private function atualizarValores(string $dealerDb): string
+    {
+        $resultado = $_SESSION['massey_result'] ?? [];
+        if (empty($resultado)) return "Sem dados para atualizar.";
+
+        $pdo = Connection::get();
+
+        // 1) Testa permissão de EXECUTE na proc do DealerNet
+        $hasExec = 0;
+        try {
+            $check = $pdo->query("SELECT HAS_PERMS_BY_NAME('{$dealerDb}.dbo.PRC_VALENCE_DN_ATUALIZAR_PRECOS_PRODUTOS','OBJECT','EXECUTE') AS HasExec");
+            $hasExec = (int)$check->fetchColumn();
+        } catch (\Throwable $e) {
+            $hasExec = 1;
+        }
+        if ($hasExec !== 1) {
+            return "Sem permissão para executar {$dealerDb}.dbo.PRC_VALENCE_DN_ATUALIZAR_PRECOS_PRODUTOS. Solicite GRANT EXECUTE ao DBA.";
+        }
+
+        // 2) Auditoria no Portal_Integra
+        $opGuid = $this->uuidv4();
+        $pdo->beginTransaction();
+        try {
+            $ins = "
+            INSERT INTO [Portal_Integra].dbo.Atualizacao_Precos_DealerNet
+            (IDUnico, dataHoraProcessamento, Marca_Codigo, Marca_Empresa,
+             Marca, Empresa, ProdutoCodigo, ProdutoReferencia, ProdutoDescricao,
+             NCMCodigo, NCMIdentificador, [ValorPlanilha(US$)], Markup,
+             FatorImportacao, CotacaoDolar, Tipo,
+             PrecoPublico, PrecoSugerido, PrecoGarantia, PrecoReposicao)
+            VALUES
+            (:id,:dh,:marcaCod,:marcaEmp,:marca,:emp,:cod,:ref,:desc,:ncmCod,:ncmId,:pl,:mk,:fi,:cot,:tipo,:pp,:ps,:ga,:rp)
+            ";
+            $stmt = $pdo->prepare($ins);
+            $now  = (new \DateTime('now', new \DateTimeZone('America/Sao_Paulo')))->format('Y-m-d H:i:s');
+
+            foreach ($resultado as $r) {
+                // Para Massey (BRL): :pl = ValorPlanilha (em BRL), :mk = Overprice (fração),
+                // :fi = IndiceParaCusto (fração), :cot = 1.0 (sem câmbio)
+                $stmt->execute([
+                    ':id'      => $opGuid,
+                    ':dh'      => $now,
+                    ':marcaCod'=> self::MARCA_ID,
+                    ':marcaEmp'=> (string)($r['Empresa'] ?? ''),
+                    ':marca'   => (string)self::MARCA_NOME,
+                    ':emp'     => (string)($r['Empresa'] ?? ''),
+                    ':cod'     => (int)($r['ProdutoCodigo'] ?? 0),
+                    ':ref'     => (string)($r['ProdutoReferencia'] ?? ''),
+                    ':desc'    => (string)($r['ProdutoDescricao'] ?? ''),
+                    ':ncmCod'  => ($r['NCMCodigo'] ?? null) !== null ? (int)$r['NCMCodigo'] : null,
+                    ':ncmId'   => (string)($r['NCMIdentificador'] ?? ''),
+                    ':pl'      => (float)($r['ValorPlanilha'] ?? 0),   // BRL
+                    ':mk'      => (float)($r['Overprice'] ?? 0),       // fração
+                    ':fi'      => (float)($r['IndiceParaCusto'] ?? 0), // fração
+                    ':cot'     => 1.0,
+                    ':tipo'    => (string)($r['Tipo'] ?? 'Massey-BRL'),
+                    ':pp'      => (float)($r['PrecoPublico'] ?? 0),
+                    ':ps'      => (float)($r['PrecoSugerido'] ?? 0),
+                    ':ga'      => (float)($r['PrecoGarantia'] ?? 0),
+                    ':rp'      => (float)($r['PrecoReposicao'] ?? 0),
+                ]);
+            }
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            return "Falha ao registrar auditoria: ".$e->getMessage();
+        }
+
+        // 3) EXEC da procedure por item no DealerNet
+        $ok = 0; $fail = 0; $errs = [];
+        $hoje = (new \DateTime('today', new \DateTimeZone('America/Sao_Paulo')))->format('Y-m-d');
+
+        $execSql = "
+        EXEC {$dealerDb}.dbo.PRC_VALENCE_DN_ATUALIZAR_PRECOS_PRODUTOS
+             @Marca_Codigo   = :marca,
+             @Produto_Codigo = :prod,
+             @PrecoPublico   = :pp,
+             @PrecoSugerido  = :ps,
+             @PrecoGarantia  = :ga,
+             @PrecoReposicao = :rp,
+             @DataVigencia   = :vig,
+             @DataValidade   = :val,
+             @Empresa_Codigo = :empCod,
+             @Usuario_Codigo = :usr
+        ";
+        $stmtExec = $pdo->prepare($execSql);
+        foreach ($resultado as $r) {
+            try {
+                $stmtExec->execute([
+                    ':marca'  => self::MARCA_ID,
+                    ':prod'   => (int)$r['ProdutoCodigo'],
+                    ':pp'     => (float)$r['PrecoPublico'],
+                    ':ps'     => (float)$r['PrecoSugerido'],
+                    ':ga'     => (float)$r['PrecoGarantia'],
+                    ':rp'     => (float)$r['PrecoReposicao'],
+                    ':vig'    => $hoje,
+                    ':val'    => null,
+                    ':empCod' => null,
+                    ':usr'    => 813 // usuário técnico (ajustável)
+                ]);
+                $ok++;
+            } catch (\Throwable $e) {
+                $fail++; $errs[] = "Produto {$r['ProdutoCodigo']}: ".$e->getMessage();
+            }
+        }
+
+        if ($fail > 0) {
+            return "Operação registrada (ID={$opGuid}). Atualizações OK: {$ok}. Falhas: {$fail}.\n"
+                 . implode("\n", $errs);
+        }
+        return "Operação concluída. ID={$opGuid}. Itens atualizados: {$ok}.";
+    }
+
+    /** ============ FUNÇÕES DE DOMÍNIO ============ */
+
+    /** Parser do arquivo texto LP% (colunas fixas) */
+    private function lerArquivoMasseyLP(string $filePath): array
+    {
+        if (!is_readable($filePath)) {
+            throw new \RuntimeException("Arquivo temporário não pode ser lido.");
+        }
+        $lines = file($filePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if (!$lines) return [];
+
+        $data = [];
+        foreach ($lines as $i => $line) {
+            // Primeira linha deve ser ignorada (sem header formal)
+            if ($i === 0) continue;
+
+            // Garante comprimento para acessar até a coluna 82
+            if (strlen($line) < 73) continue;
+
+            // Colunas fixas (1-based):
+            // [1] ignora; [2..26] ref (25); [27..59] desc (33); [60..72] ignora (13); [73..82] valor (10)
+            $ref  = rtrim(substr($line, 1, 25));   // 0-based: pos 1, len 25
+            $desc = rtrim(substr($line, 26, 33));  // 0-based: pos 26, len 33
+            $valT = substr($line, 72, 10);         // 0-based: pos 72, len 10
+
+            $ref  = trim((string)$ref);
+            $desc = trim((string)$desc);
+            $val  = $this->toNumber($valT, 0.0);
+
+            if ($ref === '') continue;
+            if (!isset($data[$ref])) {
+                $data[$ref] = [
+                    'Valor'           => $val,
+                    'PartDescription' => $desc
+                ];
+            }
+        }
+        return $data;
+    }
+
+    /** "15%" → 0.15; "70" → 0.70; "0,7" → 0.7 */
+    private function percentToFraction(string $txt, float $default): float
+    {
+        $s = trim($txt);
+        $hasPercent = strpos($s, '%') !== false;
+        $s = preg_replace('/[^\d.,+\-]/','', $s);
+        $s = str_replace(',', '.', $s);
+        if ($s === '' || $s === '.' || $s === '-' || $s === '+') return $default;
+        $num = (float)$s;
+        if ($hasPercent || $num > 1.0) return $num / 100.0;
+        return $num;
+    }
+
+	/** Conversão numérica robusta (pt-BR e en-US)
+	 * Regras:
+	 * - se tiver só vírgula  (ex.: "143,58")   => vírgula é decimal
+	 * - se tiver só ponto    (ex.: "143.58")   => ponto   é decimal
+	 * - se tiver os dois: decidimos pelo último separador que aparece na string:
+	 *     "1,234.56" => ponto decimal
+	 *     "1.234,56" => vírgula decimal
+	 */
+	private function toNumber(string $s, float $def=0.0): float
+	{
+		if ($s === '' || $s === null) return $def;
+
+		// Mantém apenas dígitos, sinais e separadores
+		$s = preg_replace('/[^\d.,+\-]/', '', (string)$s);
+		if ($s === '' || $s === '.' || $s === ',' || $s === '-' || $s === '+') return $def;
+
+		$hasDot   = strpos($s, '.') !== false;
+		$hasComma = strpos($s, ',') !== false;
+
+		if ($hasDot && $hasComma) {
+			// ambos existem -> decide pelo último separador
+			$lastDot   = strrpos($s, '.');
+			$lastComma = strrpos($s, ',');
+			if ($lastComma !== false && $lastComma > $lastDot) {
+				// vírgula é o decimal: remove pontos (milhar) e troca vírgula por ponto
+				$s = str_replace('.', '', $s);
+				$s = str_replace(',', '.', $s);
+			} else {
+				// ponto é o decimal: remove vírgulas (milhar), mantém ponto
+				$s = str_replace(',', '', $s);
+			}
+		} elseif ($hasComma && !$hasDot) {
+			// só vírgula -> vírgula decimal
+			$s = str_replace(',', '.', $s);
+		} else {
+			// só ponto -> já está decimal; NÃO remova o ponto
+			// nada a fazer
+		}
+
+		// Agora deve estar no formato en-US (ponto decimal)
+		if ($s === '' || $s === '.' || $s === '-' || $s === '+') return $def;
+		return (float)$s;
+	}
+
+    /** Cálculo de preços para Massey (valores já em R$) */
+    private function calcularPrecosMassey(float $valorBRL, float $over, float $indice): array
+    {
+        $ps = $valorBRL;
+        $pp = $ps * (1.0 + $over);
+        $rp = $ps * $indice;
+        $ga = $rp;
+        return ['PP' => $pp, 'PS' => $ps, 'GA' => $ga, 'RP' => $rp];
+    }
+
+    /** Indexa linhas por chave */
+    private function indexBy(array $rows, string $key): array
+    {
+        $m = [];
+        foreach ($rows as $r) if (isset($r[$key])) $m[(string)$r[$key]] = $r;
+        return $m;
+    }
+
+    /** Normaliza referência (mantém A‑Z/0‑9, remove separadores) */
+    private function normalizeRefStrict(string $s): string
+    {
+        $u = strtoupper(trim($s));
+        return preg_replace('/[^A-Z0-9]/', '', $u) ?? '';
+    }
+
+    /**
+     * Carrega SOMENTE os produtos da marca cujas referências constam na planilha.
+     * Não traz preços (PS/PP/GA/RP).
+     */
+    private function carregarProdutosPorReferencia(string $dealerDb, int $marcaId, array $refs): array
+    {
+        // Sanitiza/limita
+        //$refs = array_values(array_unique(array_filter(array_map('strval', $refs), fn($x)=>$x !== '')));
+		
+		$refs = array_values(
+		  array_unique(
+			array_filter(
+			  array_map('strval', $refs),
+			  function ($x) { return $x !== ''; }
+			)
+		  )
+		);
+		
+		
+        if (empty($refs)) return [];
+
+        $pdo = Connection::get();
+        $pfx = '[' . preg_replace('/[^A-Za-z0-9_.]/', '', $dealerDb) . '].dbo.'; // <<< manter exatamente assim
+
+        // Monta placeholders para IN (...)
+        $params = [':marca' => $marcaId];
+        $phs = [];
+        $max = 2000; // segurança: limite de parâmetros (ajuste se necessário)
+        $i = 0;
+        foreach ($refs as $r) {
+            if ($i >= $max) break;
+            $k = ':r'.$i;
+            $phs[] = $k;
+            $params[$k] = $r;
+            $i++;
+        }
+        $inList = implode(',', $phs);
+
+        // Consulta leve: ProdutoMarca + Produto + NCM + Marca + Empresa (apenas nome representativo)
+        $sql = "
+        SELECT
+          PM.Produto_Codigo,
+          COALESCE(PM.ProdutoMarca_Referencia, PM.ProdutoMarca_ReferenciaAlfanumerico) AS ProdutoReferencia,
+          P.Produto_Descricao AS ProdutoDescricao,
+          N.NCM_Identificador AS NCMIdentificador,
+          N.NCM_Codigo AS NCMCodigo,
+          M.Marca_Descricao AS Marca,
+          MAX(E.Empresa_Nome) AS Empresa
+        FROM {$pfx}ProdutoMarca PM
+        INNER JOIN {$pfx}Produto P ON P.Produto_Codigo = PM.Produto_Codigo
+        LEFT  JOIN {$pfx}NCM N     ON N.NCM_Codigo = P.Produto_NCMCod
+        INNER JOIN {$pfx}Marca M   ON M.Marca_Codigo = PM.ProdutoMarca_MarcaCod
+        LEFT  JOIN {$pfx}EmpresaMarca EM ON EM.EmpresaMarca_MarcaCod = PM.ProdutoMarca_MarcaCod
+        LEFT  JOIN {$pfx}Empresa E       ON E.Empresa_Codigo = EM.Empresa_Codigo
+        WHERE PM.ProdutoMarca_MarcaCod = :marca
+          AND COALESCE(PM.ProdutoMarca_Referencia, PM.ProdutoMarca_ReferenciaAlfanumerico) IN ($inList)
+        GROUP BY PM.Produto_Codigo, PM.ProdutoMarca_Referencia, PM.ProdutoMarca_ReferenciaAlfanumerico,
+                 P.Produto_Descricao, N.NCM_Identificador, N.NCM_Codigo, M.Marca_Descricao
+        ORDER BY P.Produto_Descricao;
+        ";
+
+        $st = $pdo->prepare($sql);
+        foreach ($params as $k=>$v) $st->bindValue($k, $v);
+        $st->execute();
+        return $st->fetchAll();
+    }
+
+    /** Formatação CSV (colunas “cruas” vs numéricas PT-BR) */
+    private function csvFormat(string $col, $val): string
+    {
+        static $raw = ['ProdutoCodigo','ProdutoReferencia','NCMIdentificador','NCMCodigo'];
+        if (in_array($col, $raw, true)) return (string)$val;
+        if (is_numeric($val)) return number_format((float)$val, 2, ',', '.');
+        return (string)$val;
+    }
+
+    /** GUID v4 simples */
+    private function uuidv4(): string
+    {
+        $data = random_bytes(16);
+        $data[6] = chr((ord($data[6]) & 0x0f) | 0x40);
+        $data[8] = chr((ord($data[8]) & 0x3f) | 0x80);
+        return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
+    }
+}
