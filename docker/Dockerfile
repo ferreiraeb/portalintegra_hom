@@ -19,13 +19,18 @@ RUN set -eux; \
       curl \
       gnupg \
       lsb-release \
+      # Toolchain p/ compilar extensões PECL
       $PHPIZE_DEPS \
       libssl-dev \
+      # ODBC base
       unixodbc \
       unixodbc-dev \
+      # Kerberos/GSSAPI (dependência comum do msodbcsql)
       libgssapi-krb5-2 \
+      # LDAP build
       libldap2-dev \
       libsasl2-dev \
+      # ZIP build
       libzip-dev \
       zlib1g-dev; \
     rm -rf /var/lib/apt/lists/*
@@ -96,10 +101,10 @@ RUN set -eux; \
 # ------------------------------------------------------------
 RUN a2enmod rewrite
 
-COPY Docker/vhosts.conf /etc/apache2/sites-available/portal.conf
+COPY docker/vhosts.conf /etc/apache2/sites-available/portal.conf
 RUN a2dissite 000-default && a2ensite portal
 
-# COPY Docker/servername.conf /etc/apache2/conf-available/servername.conf
+# COPY docker/servername.conf /etc/apache2/conf-available/servername.conf
 # RUN a2enconf servername
 
 # ------------------------------------------------------------
@@ -117,7 +122,7 @@ RUN set -eux; \
 # 8) Aplicação
 # ------------------------------------------------------------
 WORKDIR /var/www/html
-COPY . /var/www/html/
+COPY app/ /var/www/html/
 
 # Permissões padrão
 RUN chown -R www-data:www-data /var/www/html
