@@ -31,7 +31,7 @@ return [
         'oracle' => [],
         'mysql'  => [],
     ],*/
-	'db' => [
+'db' => [
 		'driver'   => 'sqlsrv',
 		'server'   => '10.16.96.10,3310', //HOMOLOGAÇÃO
 		'database' => 'Portal_Integra',
@@ -39,8 +39,28 @@ return [
 		'password' => 'Val@Portal#Integra%2026',
 		'options'  => [],
 
+		// ODBC Driver 18 força criptografia por padrão.
+		// O servidor usa certificado self-signed → precisamos confiar nele.
+		'encrypt'                  => true,
+		'trust_server_certificate' => true,
+
 		// 👇 NOVO: informe o nome da outra base no MESMO servidor
 		'dealernet_database' => 'GrupoValence_HML',
+
+		// ── Oracle RH (somente leitura) ──────────────────────────────────
+		// A conexão só é aberta quando a página de Colaboradores é acessada.
+		'oracle' => [
+			'host'     => '10.14.237.91',
+			'port'     => 1521,
+			'service'  => 'apollo.privatesubnet.natvcn.oraclevcn.com',
+			'username' => 'PORTALINTEGRA',
+			'password' => 'Klf658Vusa',
+			'charset'  => 'UTF8',
+			// Schema owner of the HR table (found via debug_schema).
+			'schema'       => 'SIRH',
+			// Actual table name in that schema.
+			'colabs_table' => 'RHFILTROSCOLABORADORPORTAL',
+		],
 	],
     'ldap' => [
         'enabled'      => true,
