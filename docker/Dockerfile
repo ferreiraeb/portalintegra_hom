@@ -1,0 +1,125 @@
+# ===========================
+#  Portal Integra - Dockerfile
+#  PHP 8.2 + Apache (Debian 12)
+#  SQL Server (ODBC 18 + sqlsrv)
+#  LDAP + ZIP + mod_rewrite
+# ===========================
+FROM php:8.2-apache
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# ------------------------------------------------------------
+# 1) Utilitários base, toolchain de build e libs necessárias
+# ------------------------------------------------------------
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+      apt-transport-https \
+      ca-certificates \
+      curl \
+      gnupg \
+      lsb-release \
+      $PHPIZE_DEPS \
+      libssl-dev \
+      unixodbc \
+      unixodbc-dev \
+      libgssapi-krb5-2 \
+      libldap2-dev \
+      libsasl2-dev \
+      libzip-dev \
+      zlib1g-dev; \
+    rm -rf /var/lib/apt/lists/*
+
+# ------------------------------------------------------------
+# 2) Repositório Microsoft (ODBC 18) + ferramentas
+# ------------------------------------------------------------
+RUN set -eux; \
+    curl -sSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /usr/share/keyrings/ms.gpg; \
+    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/ms.gpg] https://packages.microsoft.com/debian/12/prod bookworm main" > /etc/apt/sources.list.d/mssql-release.list; \
+    apt-get update; \
+    ACCEPT_EULA=Y apt-get install -y --no-install-recommends \
+      msodbcsql18 \
+      mssql-tools18; \
+    rm -rf /var/lib/apt/lists/*
+
+# Adiciona mssql-tools18 ao PATH
+ENV PATH="$PATH:/opt/mssql-tools18/bin"
+
+# ------------------------------------------------------------
+# 3) Extensões PHP para SQL Server (PECL) – versão fixada
+# ------------------------------------------------------------
+RUN set -eux; \
+    pecl channel-update pecl.php.net; \
+    printf "\n" | pecl install -o -f sqlsrv-5.12.0; \
+    printf "\n" | pecl install -o -f pdo_sqlsrv-5.12.0; \
+    docker-php-ext-enable sqlsrv pdo_sqlsrv; \
+    php -m | grep -Ei "sqlsrv|pdo_sqlsrv"
+
+# ------------------------------------------------------------
+# 4) Extensão LDAP (com SASL)
+# ------------------------------------------------------------
+ENV CFLAGS="$CFLAGS -DLDAP_DEPRECATED=1"
+RUN set -eux; \
+    docker-php-ext-configure ldap --with-ldap=/usr --with-ldap-sasl; \
+    docker-php-ext-install -j"$(nproc)" ldap
+
+# ------------------------------------------------------------
+# 5) Extensão ZIP (ZipArchive)
+# ------------------------------------------------------------
+RUN set -eux; \
+    docker-php-ext-configure zip; \
+    docker-php-ext-install -j"$(nproc)" zip
+
+# ------------------------------------------------------------
+# 5b) Oracle Instant Client 21.x + extensão pdo_oci
+ENV LD_LIBRARY_PATH="/opt/oracle/instantclient_21_13"
+
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends libaio1t64 unzip; \
+    ln -sf /usr/lib/x86_64-linux-gnu/libaio.so.1t64 /usr/lib/x86_64-linux-gnu/libaio.so.1; \
+    rm -rf /var/lib/apt/lists/*; \
+    mkdir -p /opt/oracle && cd /opt/oracle; \
+    curl -fsSL "https://download.oracle.com/otn_software/linux/instantclient/2113000/instantclient-basic-linux.x64-21.13.0.0.0dbru.zip" -o basic.zip; \
+    curl -fsSL "https://download.oracle.com/otn_software/linux/instantclient/2113000/instantclient-sdk-linux.x64-21.13.0.0.0dbru.zip"  -o sdk.zip; \
+    unzip -q basic.zip && unzip -q sdk.zip && rm *.zip; \
+    echo /opt/oracle/instantclient_21_13 > /etc/ld.so.conf.d/oracle-instantclient.conf; \
+    ldconfig; \
+    docker-php-ext-configure pdo_oci \
+        --with-pdo-oci=instantclient,/opt/oracle/instantclient_21_13; \
+    docker-php-ext-install -j"$(nproc)" pdo_oci; \
+    # Confirma que o .so foi gerado
+    ls "$(php-config --extension-dir)/pdo_oci.so"
+
+# ------------------------------------------------------------
+# 6) Apache: mod_rewrite + VirtualHost (+ ServerName global opcional)
+# ------------------------------------------------------------
+RUN a2enmod rewrite
+
+COPY Docker/vhosts.conf /etc/apache2/sites-available/portal.conf
+RUN a2dissite 000-default && a2ensite portal
+
+# COPY Docker/servername.conf /etc/apache2/conf-available/servername.conf
+# RUN a2enconf servername
+
+# ------------------------------------------------------------
+# 7) Ajustes de PHP (timezone e limites de upload)
+# ------------------------------------------------------------
+RUN set -eux; \
+    { \
+      echo 'date.timezone=America/Sao_Paulo'; \
+      echo 'upload_max_filesize=32M'; \
+      echo 'post_max_size=32M'; \
+      echo 'memory_limit=512M'; \
+    } > /usr/local/etc/php/conf.d/99-portal-integra.ini
+
+# ------------------------------------------------------------
+# 8) Aplicação
+# ------------------------------------------------------------
+WORKDIR /var/www/html
+COPY . /var/www/html/
+
+# Permissões padrão
+RUN chown -R www-data:www-data /var/www/html
+
+EXPOSE 80
