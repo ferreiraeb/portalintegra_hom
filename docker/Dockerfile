@@ -19,21 +19,16 @@ RUN set -eux; \
       curl \
       gnupg \
       lsb-release \
-      # Toolchain p/ compilar extensões PECL
       $PHPIZE_DEPS \
       libssl-dev \
-      # ODBC base
       unixodbc \
       unixodbc-dev \
-      # Kerberos/GSSAPI (dependência comum do msodbcsql)
       libgssapi-krb5-2 \
-      # LDAP build
       libldap2-dev \
       libsasl2-dev \
-      # ZIP build
       libzip-dev \
-      zlib1g-dev; \
-	  cron; \
+      zlib1g-dev \
+      cron; \
     rm -rf /var/lib/apt/lists/*
 
 # ------------------------------------------------------------
@@ -78,6 +73,7 @@ RUN set -eux; \
 
 # ------------------------------------------------------------
 # 5b) Oracle Instant Client 21.x + extensão pdo_oci
+# ------------------------------------------------------------
 ENV LD_LIBRARY_PATH="/opt/oracle/instantclient_21_13"
 
 RUN set -eux; \
@@ -87,26 +83,22 @@ RUN set -eux; \
     rm -rf /var/lib/apt/lists/*; \
     mkdir -p /opt/oracle && cd /opt/oracle; \
     curl -fsSL "https://download.oracle.com/otn_software/linux/instantclient/2113000/instantclient-basic-linux.x64-21.13.0.0.0dbru.zip" -o basic.zip; \
-    curl -fsSL "https://download.oracle.com/otn_software/linux/instantclient/2113000/instantclient-sdk-linux.x64-21.13.0.0.0dbru.zip"  -o sdk.zip; \
+    curl -fsSL "https://download.oracle.com/otn_software/linux/instantclient/2113000/instantclient-sdk-linux.x64-21.13.0.0.0dbru.zip" -o sdk.zip; \
     unzip -q basic.zip && unzip -q sdk.zip && rm *.zip; \
     echo /opt/oracle/instantclient_21_13 > /etc/ld.so.conf.d/oracle-instantclient.conf; \
     ldconfig; \
     docker-php-ext-configure pdo_oci \
         --with-pdo-oci=instantclient,/opt/oracle/instantclient_21_13; \
     docker-php-ext-install -j"$(nproc)" pdo_oci; \
-    # Confirma que o .so foi gerado
     ls "$(php-config --extension-dir)/pdo_oci.so"
 
 # ------------------------------------------------------------
-# 6) Apache: mod_rewrite + VirtualHost (+ ServerName global opcional)
+# 6) Apache: mod_rewrite + VirtualHost
 # ------------------------------------------------------------
 RUN a2enmod rewrite
 
 COPY docker/vhosts.conf /etc/apache2/sites-available/portal.conf
 RUN a2dissite 000-default && a2ensite portal
-
-# COPY docker/servername.conf /etc/apache2/conf-available/servername.conf
-# RUN a2enconf servername
 
 # ------------------------------------------------------------
 # 7) Ajustes de PHP (timezone e limites de upload)
@@ -125,7 +117,6 @@ RUN set -eux; \
 WORKDIR /var/www/html
 COPY app/ /var/www/html/
 
-# Permissões padrão
 RUN chown -R www-data:www-data /var/www/html
 
 # ------------------------------------------------------------
@@ -144,5 +135,3 @@ RUN chmod 0644 /etc/cron.d/portal-integra && \
 EXPOSE 80
 
 CMD ["/usr/local/bin/docker-entrypoint.sh"]
-
-
