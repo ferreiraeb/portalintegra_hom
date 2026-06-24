@@ -127,6 +127,18 @@ COPY app/ /var/www/html/
 # Permissões padrão
 RUN chown -R www-data:www-data /var/www/html
 
+# ------------------------------------------------------------
+# 9) Cron
+# ------------------------------------------------------------
+
+COPY cron/crontab-portal /etc/cron.d/portal-integra
+RUN chmod 0644 /etc/cron.d/portal-integra && \
+    echo "" >> /etc/cron.d/portal-integra && \   # ← garante newline final
+    crontab /etc/cron.d/portal-integra && \
+    touch /var/log/sync_ad.log && \
+    chown www-data:www-data /var/log/sync_ad.log
+
 EXPOSE 80
 
+CMD ["/usr/local/bin/docker-entrypoint.sh"]
 
