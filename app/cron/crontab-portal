@@ -1,2 +1,0 @@
-# Portal Integra sync ad
-0 * * * * www-data /usr/local/bin/php /var/www/html/cli/sync_ad.php >> /var/log/sync_ad.log 2>&1
