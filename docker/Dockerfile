@@ -19,16 +19,21 @@ RUN set -eux; \
       curl \
       gnupg \
       lsb-release \
+      # Toolchain p/ compilar extensões PECL
       $PHPIZE_DEPS \
       libssl-dev \
+      # ODBC base
       unixodbc \
       unixodbc-dev \
+      # Kerberos/GSSAPI (dependência comum do msodbcsql)
       libgssapi-krb5-2 \
+      # LDAP build
       libldap2-dev \
       libsasl2-dev \
+      # ZIP build
       libzip-dev \
-      zlib1g-dev \
-      cron; \
+      zlib1g-dev; \
+	  cron; \
     rm -rf /var/lib/apt/lists/*
 
 # ------------------------------------------------------------
@@ -97,10 +102,10 @@ RUN set -eux; \
 # ------------------------------------------------------------
 RUN a2enmod rewrite
 
-COPY Docker/vhosts.conf /etc/apache2/sites-available/portal.conf
+COPY docker/vhosts.conf /etc/apache2/sites-available/portal.conf
 RUN a2dissite 000-default && a2ensite portal
 
-# COPY Docker/servername.conf /etc/apache2/conf-available/servername.conf
+# COPY docker/servername.conf /etc/apache2/conf-available/servername.conf
 # RUN a2enconf servername
 
 # ------------------------------------------------------------
@@ -118,7 +123,7 @@ RUN set -eux; \
 # 8) Aplicação
 # ------------------------------------------------------------
 WORKDIR /var/www/html
-COPY . /var/www/html/
+COPY app/ /var/www/html/
 
 # Permissões padrão
 RUN chown -R www-data:www-data /var/www/html
@@ -127,15 +132,17 @@ RUN chown -R www-data:www-data /var/www/html
 # 9) Cron
 # ------------------------------------------------------------
 COPY app/cron/crontab-portal /etc/cron.d/portal-integra
+COPY app/cron/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+
 RUN chmod 0644 /etc/cron.d/portal-integra && \
+    echo "" >> /etc/cron.d/portal-integra && \
     crontab /etc/cron.d/portal-integra && \
     touch /var/log/sync_ad.log && \
-    chown www-data:www-data /var/log/sync_ad.log
-
-COPY app/cron/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+    chown www-data:www-data /var/log/sync_ad.log && \
+    chmod +x /usr/local/bin/docker-entrypoint.sh
 
 EXPOSE 80
 
 CMD ["/usr/local/bin/docker-entrypoint.sh"]
+
 
