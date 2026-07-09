@@ -1,8 +1,0 @@
-# Portal Integra — tarefas agendadas (formato /etc/cron.d/)
-# O fuso do container deve ser America/Sao_Paulo (variável TZ no docker-compose).
-SHELL=/bin/bash
-PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-
-# Sincroniza usuários do Active Directory a cada hora (minuto 0).
-0 * * * * www-data /usr/local/bin/php /var/www/html/cli/sync_ad.php >> /var/log/sync_ad.log 2>&1
-
