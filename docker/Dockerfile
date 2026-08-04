@@ -122,6 +122,7 @@ RUN chown -R www-data:www-data /var/www/html
 # ------------------------------------------------------------
 # 9) Cron
 # ------------------------------------------------------------
+sed -i 's/\r//' app/cron/crontab-portal
 COPY app/cron/crontab-portal /etc/cron.d/portal-integra
 COPY app/cron/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
