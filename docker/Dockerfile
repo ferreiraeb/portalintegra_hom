@@ -125,8 +125,7 @@ RUN chown -R www-data:www-data /var/www/html
 COPY app/cron/crontab-portal /etc/cron.d/portal-integra
 COPY app/cron/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
-RUN sed -i 's/\r//' /etc/cron.d/portal-integra
-    chmod 0644 /etc/cron.d/portal-integra && \
+RUN chmod 0644 /etc/cron.d/portal-integra && \
     echo "" >> /etc/cron.d/portal-integra && \
     touch /var/log/sync_ad.log && \
     chown www-data:www-data /var/log/sync_ad.log && \
