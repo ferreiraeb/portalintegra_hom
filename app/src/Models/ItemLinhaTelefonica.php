@@ -18,6 +18,10 @@ class ItemLinhaTelefonica extends BaseModel {
     public ?string $contrato = null;
     public ?string $plano = null;
     public ?float $custo_mensal = null;
+	public ?string $cnpj_empresa  = null;
+	public ?int $IdLinha  = null;
+	public ?date $data_contrato  = null;
+	public ?int $duracao  = null;    
 
     /** Rótulos do status da linha (valor no banco => exibição). */
     public static function statusLinhaLabels(): array
@@ -40,6 +44,10 @@ class ItemLinhaTelefonica extends BaseModel {
             'plano'         => 'Plano',
             'custo_mensal'  => 'Custo mensal',
             'status_linha'  => 'Status da linha',
+			'cnpj_empresa'  => 'CNPJ Empresa',
+			'IdLinha'  => 'ID da Linha',
+			'data_contrato'  => 'Data Contrato',
+			'duracao'  => 'Duração',            
         ];
     }
 
