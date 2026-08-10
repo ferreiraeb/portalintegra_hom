@@ -99,12 +99,16 @@ $rd = fn(string $key, $def = '—') => format_date_br($i[$key] ?? null, $def);
         <hr>
 
         <?php if ($tabelaAtual === 'item_linha_telefonica'): ?>
-          <h6 class="text-muted mb-3">Linha Telefônica</h6>
+ <h6 class="text-muted mb-3">Linha Telefônica</h6>
           <div class="row">
             <div class="col-md-6 form-group">
               <label>Número da linha</label>
               <input class="form-control" readonly value="<?= $rv('numero_linha') ?>">
             </div>
+            <div class="col-md-6 form-group">
+              <label>Empresa Faturamento</label>
+              <input class="form-control" readonly value="<?= $rv('cnpj_empresa') ?>">
+            </div>			
             <div class="col-md-6 form-group">
               <label>ICC-ID / Número do chip</label>
               <input class="form-control" readonly value="<?= $rv('numero_chip') ?>">
@@ -142,8 +146,20 @@ $rd = fn(string $key, $def = '—') => format_date_br($i[$key] ?? null, $def);
               <label>Plano</label>
               <input class="form-control" readonly value="<?= $rv('plano') ?>">
             </div>
+            <div class="col-md-6 form-group">
+              <label>ID Linha</label>
+              <input class="form-control" readonly value="<?= $rv('IdLinha') ?>">
+            </div>
+            <div class="col-md-6 form-group">
+              <label>Data Contrato</label>
+              <input class="form-control" readonly value="<?= $rv('data_contrato') ?>">
+            </div>
+            <div class="col-md-6 form-group">
+              <label>Duração (Meses)</label>
+              <input class="form-control" readonly value="<?= $rv('duracao') ?>">
+            </div>			
           </div>
-
+          
         <?php elseif ($tabelaAtual === 'item_equipamento_ti'): ?>
           <h6 class="text-muted mb-3">Equipamento TI</h6>
           <div class="row">
