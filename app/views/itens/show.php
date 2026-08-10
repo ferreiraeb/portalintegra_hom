@@ -99,7 +99,7 @@ $rd = fn(string $key, $def = '—') => format_date_br($i[$key] ?? null, $def);
         <hr>
 
         <?php if ($tabelaAtual === 'item_linha_telefonica'): ?>
- <h6 class="text-muted mb-3">Linha Telefônica</h6>
+          <h6 class="text-muted mb-3">Linha Telefônica</h6>
           <div class="row">
             <div class="col-md-6 form-group">
               <label>Número da linha</label>
@@ -108,16 +108,16 @@ $rd = fn(string $key, $def = '—') => format_date_br($i[$key] ?? null, $def);
             <div class="col-md-6 form-group">
               <label>Empresa Faturamento</label>
               <input class="form-control" readonly value="<?= $rv('cnpj_empresa') ?>">
+            </div>	
+			<div class="col-md-6 form-group">
+              <label>Custo mensal (R$)</label>
+              <input class="form-control" readonly value="<?= $rv('custo_mensal') ?>">
             </div>			
-            <div class="col-md-6 form-group">
-              <label>ICC-ID / Número do chip</label>
-              <input class="form-control" readonly value="<?= $rv('numero_chip') ?>">
-            </div>
             <div class="col-md-6 form-group">
               <label>Número anterior (portabilidade)</label>
               <input class="form-control" readonly value="<?= $rv('numero_anterior') ?>">
             </div>
-            <div class="col-md-6 form-group">
+            <div class="col-md-4 form-group">
               <label>Operadora</label>
               <input class="form-control" readonly value="<?= $rv('operadora') ?>">
             </div>
@@ -134,10 +134,10 @@ $rd = fn(string $key, $def = '—') => format_date_br($i[$key] ?? null, $def);
               ?>
               <input class="form-control" readonly value="<?= e($statusLinhaTexto ?: '—') ?>">
             </div>
-            <div class="col-md-4 form-group">
-              <label>Custo mensal (R$)</label>
-              <input class="form-control" readonly value="<?= $rv('custo_mensal') ?>">
-            </div>
+             <div class="col-md-6 form-group">
+              <label>ICC-ID / Número do chip</label>
+              <input class="form-control" readonly value="<?= $rv('numero_chip') ?>">
+            </div>           
             <div class="col-md-6 form-group">
               <label>Contrato</label>
               <input class="form-control" readonly value="<?= $rv('contrato') ?>">
