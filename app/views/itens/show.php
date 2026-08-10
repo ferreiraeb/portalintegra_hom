@@ -155,11 +155,23 @@ $rd = fn(string $key, $def = '—') => format_date_br($i[$key] ?? null, $def);
               <input class="form-control" readonly value="<?= $rv('data_contrato') ?>">
             </div>
             <div class="col-md-6 form-group">
+              <label>Fim Contrato</label>
+              <input class="form-control" readonly value="<?= $rv('fim_contrato') ?>">
+            </div>			
+            <div class="col-md-6 form-group">
               <label>Duração (Meses)</label>
               <input class="form-control" readonly value="<?= $rv('duracao') ?>">
-            </div>			
+            </div>	
+            <div class="col-md-6 form-group">
+              <label>Fidelização (Meses)</label>
+              <input class="form-control" readonly value="<?= $rv('fidelizacao') ?>">
+            </div>	
+            <div class="col-md-12 form-group">
+              <label>Observações</label>
+              <input class="form-control" readonly value="<?= $rv('observacoes') ?>">
+            </div>				
           </div>
-          
+
         <?php elseif ($tabelaAtual === 'item_equipamento_ti'): ?>
           <h6 class="text-muted mb-3">Equipamento TI</h6>
           <div class="row">
