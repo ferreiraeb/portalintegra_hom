@@ -87,6 +87,28 @@ return [
         // Permissão default ao importar do AD: nenhum (0), admin define depois
         'default_permission_level' => 0
     ],
+  // ── E-mail (SMTP) ────────────────────────────────────────────────────────
+    'mail' => [
+        'enabled'          => true,
+        'smtp_host'        => 'smtp-mail.outlook.com',
+        'smtp_port'        => 587,
+        'smtp_encryption'  => 'tls',           // tls | ssl | none
+        'smtp_user'        => 'envio@valence.com.br',
+        'smtp_password'    => 'P@$$ccmVal',
+        'from_email'       => 'envio@valence.com.br',
+        'from_name'        => 'Portal Integra — Grupo Valence',
+        'timeout'          => 30,
+    ],
+    // ── E-mails de aniversário (cli/send_birthday_emails.php) ───────────────
+    'birthday' => [
+        'enabled' => true,
+        // E-mail 1: resumo diário para o grupo
+        'group_recipients' => ['TI@valence.com.br'],
+        // E-mail 2: enquanto em testes, redireciona o individual para este endereço
+        // Para produção: defina como null para enviar ao e-mail/UPN do aniversariante.
+        'individual_override_email' => 'eduardo.brito@valence.com.br',
+        'banner_path' => 'public/assets/img/aniversario.png',
+    ],		
 ];
 
 ?>
