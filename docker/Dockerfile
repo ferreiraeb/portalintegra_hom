@@ -132,7 +132,7 @@ RUN sed -i 's/\r$//' /etc/cron.d/portal-integra && \
     crontab /etc/cron.d/portal-integra && \
     touch /var/log/sync_ad.log && \
     chown www-data:www-data /var/log/sync_ad.log && \
-    chmod +x /usr/local/bin/docker-entrypoint.sh
+    chmod +x /usr/local/bin/docker-entrypoint.sh && \
 	sed -i 's/\r//' /var/www/html/cron/crontab-portal
 
 EXPOSE 80
