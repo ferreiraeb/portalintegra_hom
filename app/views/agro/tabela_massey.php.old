@@ -1,0 +1,268 @@
+<?php
+/** Variáveis esperadas do controller:
+ * @var string|null $erro
+ * @var array $rows
+ * @var array $soSistema
+ * @var array $soPlanilha
+ * @var string $uiOver
+ * @var string $uiIndice
+ * @var string $marcaNome
+ * @var string|null $base  // defina no controller: $base = base_url('agro/tabela-massey')
+ */
+$flash = $_SESSION['massey_flash'] ?? null;
+unset($_SESSION['massey_flash']);
+
+$reqBase = htmlspecialchars(strtok($_SERVER['REQUEST_URI'] ?? '', '?'));
+$base = isset($base) && is_string($base) && $base !== '' ? $base : ($reqBase ?: '#');
+
+// Contadores
+$totalRows      = is_array($rows) ? count($rows) : 0;
+$totalSoSistema = is_array($soSistema) ? count($soSistema) : 0;
+$totalSoPlan    = is_array($soPlanilha) ? count($soPlanilha) : 0;
+?>
+
+<section class="content pt-3">
+  <div class="container-fluid">
+
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h3 class="card-title mb-0">Agro — Tabela Massey Ferguson</h3>
+        <span class="text-muted small">
+          Marca: <strong><?= htmlspecialchars($marcaNome ?? 'Massey Ferguson') ?></strong>
+        </span>
+      </div>
+
+      <!-- CARD BODY: Mensagens de sistema -->
+      <div class="card-body">
+
+        <?php if ($flash): ?>
+          <div class="alert alert-success" role="alert">
+            <pre class="mb-0" style="white-space:pre-wrap;"><?= htmlspecialchars($flash) ?></pre>
+          </div>
+        <?php endif; ?>
+
+        <?php if ($erro): ?>
+          <div class="alert alert-danger" role="alert">
+            <pre class="mb-0" style="white-space:pre-wrap;"><?= htmlspecialchars($erro) ?></pre>
+          </div>
+        <?php endif; ?>
+
+
+
+        <form method="post" enctype="multipart/form-data" class="mb-3">
+			
+		<div class="form-row">
+          <div class="form-group col-md-8">
+			<label>Clique no botão abaixo e selecione o arquivo com a lista de preços</label>
+            <input type="file" name="arquivo" accept=".lp%," class="form-control-file" required>
+			<small class="form-text text-muted">
+                O arquivo anexo deve ser o enviado pelo fabricante no forma "lp%", sem manipulações. 
+            </small>
+          </div>
+		</div>
+		<div class="form-row">
+		
+          <div class="col-12 col-md-6">
+            <label class="form-label">Overprice</label>
+            <input type="text" name="overprice" value="<?= htmlspecialchars($uiOver ?? '15%') ?>" class="form-control" placeholder="15% ou 0,15">
+            <div class="form-text">Percentual a ser adicionado ao valor sugerído pelo fabricante "Preço Publico"</div>
+          </div>
+
+          <div class="col-12 col-md-6">
+            <label class="form-label">Índice para Custo</label>
+            <input type="text" name="indice_custo" value="<?= htmlspecialchars($uiIndice ?? '70%') ?>" class="form-control" placeholder="70% ou 0,70">
+            <div class="form-text">Percentual a do valor sugerído pelo fabricante para formar o "Preço Garantia" e "Preço Reposição"</div>
+          </div>
+		</div>
+		
+		<!-- Quebra linha -->
+		
+		<div class="form-row">
+			<div class="form-group col-md-8">
+			  <!-- Marca ID oculto (fixo) -->
+			  <input type="hidden" name="marca_id" value="96">
+			
+			  
+				<button type="submit" class="btn btn-primary">
+				  <i class="fas fa-cog me-1"></i> Processar
+				</button>
+				<a class="btn btn-outline-secondary" href="<?= $base ?>?export=1">
+				  <i class="fas fa-file-export me-1"></i> Exportar CSV
+				</a>
+			 </div>
+		 </div>
+
+        </form>
+		
+		
+		<ul class="nav nav-tabs" id="mfTabs" role="tablist">
+          <li class="nav-item">
+            <a class="nav-link active" id="tab-relacao" data-toggle="tab" href="#pane-relacao" role="tab">Relação de Itens</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" id="tab-sistema" data-toggle="tab" href="#pane-sistema" role="tab">Itens Apenas DealerNet</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" id="tab-planilha" data-toggle="tab" href="#pane-planilha" role="tab">Itens Apenas Planilha</a>
+          </li>
+        </ul>
+		
+		
+
+        <!-- NAV TABS (AdminLTE) -->
+		<!--
+        <ul class="nav nav-pills mt-4" id="mfTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="tab-relacao" data-bs-toggle="pill" data-bs-target="#pane-relacao" type="button" role="tab" aria-controls="pane-relacao" aria-selected="true">
+              Relação de Itens
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-sistema" data-bs-toggle="pill" data-bs-target="#pane-sistema" type="button" role="tab" aria-controls="pane-sistema" aria-selected="false">
+              Itens Apenas DealerNet
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-planilha" data-bs-toggle="pill" data-bs-target="#pane-planilha" type="button" role="tab" aria-controls="pane-planilha" aria-selected="false">
+              Itens Apenas Planilha
+            </button>
+          </li>
+        </ul>
+		-->
+
+        <div class="tab-content mt-3" id="mfTabsContent">
+          <!-- PANE: RELAÇÃO -->
+          <div class="tab-pane fade show active" id="pane-relacao" role="tabpanel" aria-labelledby="tab-relacao">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <div class="text-muted">
+                Total de linhas: <strong><?= number_format($totalRows,0,',','.') ?></strong>
+              </div>
+              <div>
+                <a class="btn btn-success btn-sm" href="<?= $base ?>?update=1">
+                  <i class="fas fa-save me-1"></i> Atualizar Valores
+                </a>
+                <span class="small text-muted ms-2">
+                  Registra auditoria (Portal_Integra) e executa a procedure por item (DealerNet).
+                </span>
+              </div>
+            </div>
+
+            <?php if ($totalRows === 0): ?>
+              <div class="text-muted">Nenhum registro processado.</div>
+            <?php else: ?>
+              <div class="table-responsive">
+                <table class="table table-sm table-bordered align-middle">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Empresa</th>
+                      <th>Código</th>
+                      <th>Referência</th>
+                      <th>Descrição</th>
+                      <th>NCM</th>
+                      <th>ValorPlanilha (R$)</th>
+                      <th>Overprice</th>
+                      <th>Índice Custo</th>
+                      <th>PP</th>
+                      <th>PS</th>
+                      <th>GA</th>
+                      <th>RP</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <?php foreach ($rows as $r): ?>
+                      <tr>
+                        <td><?= htmlspecialchars($r['Empresa'] ?? '') ?></td>
+                        <td><?= htmlspecialchars($r['ProdutoCodigo'] ?? '') ?></td>
+                        <td><?= htmlspecialchars($r['ProdutoReferencia'] ?? '') ?></td>
+                        <td><?= htmlspecialchars($r['ProdutoDescricao'] ?? '') ?></td>
+                        <td><?= htmlspecialchars(trim(($r['NCMIdentificador'] ?? '').' '.($r['NCMCodigo'] ?? ''))) ?></td>
+                        <td><?= number_format((float)($r['ValorPlanilha'] ?? 0), 2, ',', '.') ?></td>
+                        <td><?= number_format((float)($r['Overprice'] ?? 0) * 100, 2, ',', '.') ?>%</td>
+                        <td><?= number_format((float)($r['IndiceParaCusto'] ?? 0) * 100, 2, ',', '.') ?>%</td>
+                        <td><?= number_format((float)($r['PrecoPublico'] ?? 0), 2, ',', '.') ?></td>
+                        <td><?= number_format((float)($r['PrecoSugerido'] ?? 0), 2, ',', '.') ?></td>
+                        <td><?= number_format((float)($r['PrecoGarantia'] ?? 0), 2, ',', '.') ?></td>
+                        <td><?= number_format((float)($r['PrecoReposicao'] ?? 0), 2, ',', '.') ?></td>
+                      </tr>
+                    <?php endforeach; ?>
+                  </tbody>
+                </table>
+              </div>
+            <?php endif; ?>
+          </div>
+
+          <!-- PANE: APENAS DEALERNET -->
+          <div class="tab-pane fade" id="pane-sistema" role="tabpanel" aria-labelledby="tab-sistema">
+            <div class="text-muted mb-2">
+              Os itens desta lista não foram localizados na planilha anexa, porém estão presentes no DealerNet.
+              Total de linhas: <strong><?= number_format($totalSoSistema,0,',','.') ?></strong>
+            </div>
+
+            <?php if ($totalSoSistema === 0): ?>
+              <div class="text-muted">Nenhum registro.</div>
+            <?php else: ?>
+              <div class="table-responsive">
+                <table class="table table-sm table-bordered align-middle">
+                  <thead class="table-light">
+                    <tr>
+                      <th>ProdutoCódigo</th>
+                      <th>ProdutoReferencia</th>
+                      <th>ProdutoDescricao</th>
+                      <th>NCM</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <?php foreach ($soSistema as $r): ?>
+                      <tr>
+                        <td><?= htmlspecialchars($r['ProdutoCodigo'] ?? '') ?></td>
+                        <td><?= htmlspecialchars($r['ProdutoReferencia'] ?? '') ?></td>
+                        <td><?= htmlspecialchars($r['ProdutoDescricao'] ?? '') ?></td>
+                        <td><?= htmlspecialchars(trim(($r['NCMIdentificador'] ?? '').' '.($r['NCMCodigo'] ?? ''))) ?></td>
+                      </tr>
+                    <?php endforeach; ?>
+                  </tbody>
+                </table>
+              </div>
+            <?php endif; ?>
+          </div>
+
+          <!-- PANE: APENAS PLANILHA -->
+          <div class="tab-pane fade" id="pane-planilha" role="tabpanel" aria-labelledby="tab-planilha">
+            <div class="text-muted mb-2">
+              Os itens desta lista foram localizados na planilha anexa, porém não estão presentes no DealerNet.
+              Total de linhas: <strong><?= number_format($totalSoPlan,0,',','.') ?></strong>
+            </div>
+
+            <?php if ($totalSoPlan === 0): ?>
+              <div class="text-muted">Nenhum registro.</div>
+            <?php else: ?>
+              <div class="table-responsive">
+                <table class="table table-sm table-bordered align-middle">
+                  <thead class="table-light">
+                    <tr>
+                      <th>ProdutoReferencia</th>
+                      <th>PartDescription</th>
+                      <th>ValorPlanilha (R$)</th>
+                      <th>RefNormalizada</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <?php foreach ($soPlanilha as $r): ?>
+                      <tr>
+                        <td><?= htmlspecialchars($r['ProdutoReferencia'] ?? '') ?></td>
+                        <td><?= htmlspecialchars($r['PartDescription'] ?? '') ?></td>
+                        <td><?= number_format((float)($r['ValorPlanilha'] ?? 0), 2, ',', '.') ?></td>
+                        <td><?= htmlspecialchars($r['RefNormalizada'] ?? '') ?></td>
+                      </tr>
+                    <?php endforeach; ?>
+                  </tbody>
+                </table>
+              </div>
+            <?php endif; ?>
+          </div>
+
+        </div><!-- /tab-content -->
+      </div><!-- /card-body -->
+    </div><!-- /card -->
+  </div><!-- /container-fluid -->
+</section>
