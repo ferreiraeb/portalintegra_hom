@@ -95,9 +95,9 @@ return [
         'smtp_host'        => 'smtp-mail.outlook.com',
         'smtp_port'        => 587,
         'smtp_encryption'  => 'tls',           // tls | ssl | none
-        'smtp_user'        => 'envio@valence.com.br',
-        'smtp_password'    => 'P@$$ccmVal',
-        'from_email'       => 'envio@valence.com.br',
+        'smtp_user'        => 'comunicacaointerna@valence.com.br',
+        'smtp_password'    => 'Sorvete@2025',
+        'from_email'       => 'comunicacaointerna@valence.com.br',
         'from_name'        => 'Portal Integra — Grupo Valence',
         'timeout'          => 30,
     ],
