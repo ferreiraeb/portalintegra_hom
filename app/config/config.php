@@ -103,13 +103,17 @@ return [
     ],
     // ── E-mails de aniversário (cli/send_birthday_emails.php) ───────────────
     'birthday' => [
-        'enabled' => true,
+        'enabled' => false,
+		'test_mode' => true,
         // E-mail 1: resumo diário para o grupo
         'group_recipients' => ['TI@valence.com.br'],
         // E-mail 2: enquanto em testes, redireciona o individual para este endereço
         // Para produção: defina como null para enviar ao e-mail/UPN do aniversariante.
         'individual_override_email' => 'eduardo.brito@valence.com.br',
         'banner_path' => 'public/assets/img/aniversario.png',
+
+
+	
     ],	
 ];
 
