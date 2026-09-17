@@ -103,7 +103,7 @@ return [
     ],
     // ── E-mails de aniversário (cli/send_birthday_emails.php) ───────────────
     'birthday' => [
-        'enabled' => false,
+        'enabled' => true,
 		'test_mode' => true,
         // E-mail 1: resumo diário para o grupo
         'group_recipients' => ['TI@valence.com.br'],
